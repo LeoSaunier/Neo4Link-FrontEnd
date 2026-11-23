@@ -14,7 +14,14 @@ export function FeedPage() {
   // Rechargé quand l'utilisateur change ou quand il suit / ne suit plus quelqu'un (graphVersion)
   const feed = useAsync(() => api.getFeed(user._id, 20), [user._id, graphVersion])
   const [published, setPublished] = useState<Post | null>(null)
+  const [tagQuery, setTagQuery] = useState('')
+  const normalizeTag = (tag: string) =>
+    tag.trim().replace(/^#/, '').trim().toLowerCase()
+  const searchedTag = normalizeTag(tagQuery)
 
+  const visiblePosts = feed.data?.filter((post) =>
+    searchedTag === '' || post.tags.some((tag) => normalizeTag(tag) === searchedTag),
+  )
   return (
     <div className="space-y-4">
       <PageHeader title="Fil d'actualité" subtitle="Les publications des personnes que vous suivez" dbs={['neo4j', 'mongodb']} />
@@ -32,7 +39,17 @@ export function FeedPage() {
       />
 
       <PostComposer onCreated={setPublished} />
-
+      <label className="block text-sm font-medium">
+        Rechercher par hashtag
+        <input
+          type="search"
+          value={tagQuery}
+          onChange={(event) => setTagQuery(event.target.value)}
+          placeholder="Ex. #séminaire"
+          className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2"
+        />
+      </label>
+      
       {published && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
           <span>Publié ! Ce post apparaîtra dans le fil des personnes qui vous suivent.</span>
@@ -62,7 +79,12 @@ export function FeedPage() {
           .
         </EmptyState>
       )}
-      {feed.data?.map((post) => <PostCard key={post._id} post={post} />)}
+      {searchedTag && feed.data && visiblePosts?.length === 0 && (
+        <EmptyState title="Aucune publication pour ce hashtag">
+          Essaie un autre tag ou efface la recherche.
+        </EmptyState>
+      )}
+      {visiblePosts?.map((post) => <PostCard key={post._id} post={post} />)}
     </div>
   )
 }
