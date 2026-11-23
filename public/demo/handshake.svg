@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340">
+  <rect width="600" height="340" fill="#fef3c7"/>
+  <!-- Bâtiment universitaire -->
+  <g fill="#78716c">
+    <polygon points="300,40 470,100 130,100"/>
+    <rect x="140" y="100" width="320" height="16"/>
+    <rect x="140" y="250" width="320" height="20"/>
+  </g>
+  <g fill="#a8a29e">
+    <rect x="160" y="120" width="22" height="130"/>
+    <rect x="215" y="120" width="22" height="130"/>
+    <rect x="270" y="120" width="22" height="130"/>
+    <rect x="308" y="120" width="22" height="130"/>
+    <rect x="363" y="120" width="22" height="130"/>
+    <rect x="418" y="120" width="22" height="130"/>
+  </g>
+  <!-- Contrat -->
+  <g transform="rotate(-8 300 290)">
+    <rect x="230" y="255" width="140" height="70" rx="3" fill="#ffffff" stroke="#d6d3d1"/>
+    <g stroke="#a8a29e" stroke-width="3" stroke-linecap="round">
+      <line x1="245" y1="272" x2="355" y2="272"/>
+      <line x1="245" y1="285" x2="340" y2="285"/>
+    </g>
+    <path d="M250 308 q12 -14 22 0 t22 0 t20 -4" fill="none" stroke="#2563eb" stroke-width="2.5"/>
+  </g>
+  <!-- Stylo -->
+  <g transform="rotate(35 420 280)">
+    <rect x="400" y="270" width="80" height="10" rx="5" fill="#0f172a"/>
+    <polygon points="400,270 386,275 400,280" fill="#facc15"/>
+  </g>
+</svg>
