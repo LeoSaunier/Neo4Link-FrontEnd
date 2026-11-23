@@ -112,6 +112,7 @@ function followersOf(id: string): string[] {
 
 /** Hydratation : à partir d'identifiants (venus de Neo4j), récupère les profils dans MongoDB. */
 function hydrate(db: Recorder, userIds: string[], operation = 'Hydrater les profils'): UserSummary[] {
+  if (userIds.length === 0) return [] // rien à demander à MongoDB
   db.mongo(operation, `db.users.find({ _id: { $in: ${ids(userIds)} } }, ${SUMMARY_PROJECTION})`)
   return userIds
     .map((id) => mongo.users.get(id))
@@ -240,6 +241,7 @@ export const mockApi: Neo4LinkApi = {
       db.neo4j('1. Qui est-ce que je suis ?', `MATCH (:User {id: "${id}"})-[:FOLLOWS]->(f:User)\nRETURN collect(f.id) AS ids`)
       if (!neo4j.nodes.has(id)) throw new ApiError(404, `Utilisateur ${id} introuvable`)
       const followed = followingOf(id)
+      if (followed.length === 0) return [] // je ne suis personne : fil vide, inutile d'interroger MongoDB
 
       // Étape 2 — MongoDB : leurs posts les plus récents
       db.mongo(
