@@ -13,7 +13,7 @@ interface Result<T> {
  * Charge des données de façon asynchrone (un appel API) et suit son état.
  *
  * Exemple :
- *   const feed = useAsync(() => api.getFeed(user.id), [user.id])
+ *   const feed = useAsync(() => api.getFeed(user._id), [user._id])
  *   feed.loading  -> true pendant le chargement
  *   feed.data     -> le résultat une fois arrivé
  *   feed.error    -> l'erreur si l'appel a échoué

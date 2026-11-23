@@ -1,13 +1,14 @@
 import { createContext, useContext } from 'react'
-import type { UserSummary } from '../types'
+import type { LoginRequest, RegisterRequest, User } from '../types'
 
 // « Contexte » React = une valeur partagée par tous les composants, sans la passer de parent en enfant.
-// Ici : qui est l'utilisateur connecté, et qui suit-il (pour afficher les boutons Suivre / Abonné).
+// Ici : qui est connecté, et qui suit-il (pour afficher les boutons Suivre / Abonné).
 // Le composant qui fournit cette valeur est CurrentUserProvider.tsx.
 
 export interface CurrentUserValue {
-  /** Utilisateur choisi, ou null si aucun profil n'est sélectionné. */
-  user: UserSummary | null
+  /** Utilisateur connecté, ou null. */
+  user: User | null
+  /** true pendant la reprise de session au chargement de la page. */
   loading: boolean
   error: string | null
   /** Identifiants des personnes que l'utilisateur suit (vient de Neo4j). */
@@ -17,7 +18,10 @@ export interface CurrentUserValue {
    * Les pages qui dépendent du graphe (fil, suggestions, profils) s'en servent pour se recharger.
    */
   graphVersion: number
-  login(userId: string): void
+  /** Connexion (POST /auth/login). Lève une ApiError si les identifiants sont faux. */
+  login(input: LoginRequest): Promise<void>
+  /** Inscription (POST /auth/register), puis connexion automatique. */
+  register(input: RegisterRequest): Promise<void>
   logout(): void
   retry(): void
   follow(targetId: string): Promise<void>

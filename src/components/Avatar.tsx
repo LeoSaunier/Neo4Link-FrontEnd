@@ -1,6 +1,5 @@
-import type { UserSummary } from '../types'
-
 const SIZES = {
+  xs: 'size-7 text-[10px]',
   sm: 'size-8 text-xs',
   md: 'size-10 text-sm',
   lg: 'size-14 text-lg',
@@ -27,17 +26,17 @@ function initials(name: string) {
     .join('')
 }
 
-/** Photo de profil, ou initiales sur fond coloré si avatar_url est null. */
-export function Avatar({ user, size = 'md' }: { user: UserSummary; size?: keyof typeof SIZES }) {
-  if (user.avatar_url) {
-    return <img src={user.avatar_url} alt="" className={`${SIZES[size]} shrink-0 rounded-full object-cover`} />
-  }
+/**
+ * Pastille avec les initiales sur un fond coloré (le back ne stocke pas de photo de profil).
+ * `id` sert à choisir la couleur, toujours la même pour une même personne.
+ */
+export function Avatar({ id, name, size = 'md' }: { id: string; name: string; size?: keyof typeof SIZES }) {
   return (
     <span
-      className={`${SIZES[size]} ${colorFor(user.id)} inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white`}
+      className={`${SIZES[size]} ${colorFor(id)} inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white`}
       aria-hidden="true"
     >
-      {initials(user.display_name)}
+      {initials(name)}
     </span>
   )
 }

@@ -9,7 +9,7 @@ import type { Suggestion } from '../types'
 /** Suggestions « amis d'amis » : GET /users/{id}/suggestions — parcours à 2 sauts dans Neo4j. */
 export function SuggestionsPage() {
   const { user, graphVersion } = useLoggedUser()
-  const suggestions = useAsync(() => api.getSuggestions(user.id, 12), [user.id, graphVersion])
+  const suggestions = useAsync(() => api.getSuggestions(user._id, 12), [user._id, graphVersion])
 
   return (
     <div className="space-y-4">
@@ -45,7 +45,7 @@ export function SuggestionsPage() {
       {suggestions.data && suggestions.data.length > 0 && (
         <Card className="divide-y divide-slate-100">
           {suggestions.data.map((s) => (
-            <UserCard key={s.user.id} user={s.user}>
+            <UserCard key={s.user._id} user={s.user}>
               <ViaText suggestion={s} />
             </UserCard>
           ))}
@@ -57,7 +57,7 @@ export function SuggestionsPage() {
 
 /** « Suivi par Alice, Bob et 2 autres personnes que vous suivez » */
 function ViaText({ suggestion }: { suggestion: Suggestion }) {
-  const names = suggestion.via.map((u) => u.display_name.split(' ')[0])
+  const names = suggestion.via.map((u) => u.profile.full_name.split(' ')[0])
   const others = suggestion.mutual_count - names.length
   return (
     <p className="mt-0.5 text-xs text-slate-500">

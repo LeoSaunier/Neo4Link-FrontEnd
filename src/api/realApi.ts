@@ -1,13 +1,13 @@
 import axios from 'axios'
 import type {
+  CommentCreate,
   DbTraceEntry,
-  FeedItem,
+  LoginRequest,
   Post,
   PostCreate,
+  RegisterRequest,
   Suggestion,
   User,
-  UserCreate,
-  UserProfile,
   UserSummary,
 } from '../types'
 import { ApiError, type Neo4LinkApi } from './api'
@@ -47,7 +47,7 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
       db: parseDbTrace(response?.headers['x-db-trace']),
     })
     if (!response) {
-      throw new ApiError(0, "Le back ne répond pas. Est-il démarré sur le port 8000 ?")
+      throw new ApiError(0, 'Le back ne répond pas. Est-il démarré sur le port 8000 ?')
     }
     throw new ApiError(response.status, extractDetail(response.data))
   }
@@ -78,16 +78,24 @@ function extractDetail(data: unknown): string {
 
 const enc = encodeURIComponent
 
+// Toutes les URL du back sont ici. Voir docs/API_CONTRACT.md pour le statut de chaque route
+// (certaines sont encore des propositions : si le back choisit une autre URL, c'est la seule ligne à changer).
 export const realApi: Neo4LinkApi = {
+  register: (input: RegisterRequest) => request<User>('POST', '/auth/register', input),
+  login: (input: LoginRequest) => request<User>('POST', '/auth/login', input),
+
   listUsers: () => request<UserSummary[]>('GET', '/users'),
-  createUser: (input: UserCreate) => request<User>('POST', '/users', input),
-  getUserProfile: (id) => request<UserProfile>('GET', `/users/${enc(id)}`),
+  getUser: (id) => request<User>('GET', `/users/${enc(id)}`),
   getUserPosts: (id) => request<Post[]>('GET', `/users/${enc(id)}/posts`),
   getFollowing: (id) => request<UserSummary[]>('GET', `/users/${enc(id)}/following`),
   getFollowers: (id) => request<UserSummary[]>('GET', `/users/${enc(id)}/followers`),
   follow: (id, targetId) => request<void>('POST', `/users/${enc(id)}/follow`, { target_id: targetId }),
   unfollow: (id, targetId) => request<void>('DELETE', `/users/${enc(id)}/follow/${enc(targetId)}`),
-  getFeed: (id, limit = 20) => request<FeedItem[]>('GET', `/users/${enc(id)}/feed?limit=${limit}`),
+  getFeed: (id, limit = 20) => request<Post[]>('GET', `/users/${enc(id)}/feed?limit=${limit}`),
   getSuggestions: (id, limit = 10) => request<Suggestion[]>('GET', `/users/${enc(id)}/suggestions?limit=${limit}`),
+
   createPost: (input: PostCreate) => request<Post>('POST', '/posts', input),
+  likePost: (postId, userId) => request<Post>('POST', `/posts/${enc(postId)}/like`, { user_id: userId }),
+  unlikePost: (postId, userId) => request<Post>('DELETE', `/posts/${enc(postId)}/like/${enc(userId)}`),
+  addComment: (postId, input: CommentCreate) => request<Post>('POST', `/posts/${enc(postId)}/comments`, input),
 }

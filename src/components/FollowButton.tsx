@@ -3,8 +3,8 @@ import { useCurrentUser } from '../context/currentUser'
 import { errorMessage } from '../lib/format'
 
 /**
- * Bouton Suivre / Abonné. Un clic crée ou supprime une relation FOLLOWS dans Neo4j
- * (POST /users/{id}/follow ou DELETE /users/{id}/follow/{target_id}).
+ * Bouton Suivre / Abonné. Un clic crée ou supprime une relation FOLLOWS dans Neo4j, et le back
+ * met à jour les compteurs dans MongoDB (POST /users/{id}/follow ou DELETE /users/{id}/follow/{target_id}).
  */
 export function FollowButton({ targetId, className = '' }: { targetId: string; className?: string }) {
   const { user, followingIds, follow, unfollow } = useCurrentUser()
@@ -12,7 +12,7 @@ export function FollowButton({ targetId, className = '' }: { targetId: string; c
   const [error, setError] = useState<string | null>(null)
 
   // Pas de bouton sur son propre profil
-  if (!user || user.id === targetId) return null
+  if (!user || user._id === targetId) return null
 
   const isFollowing = followingIds.has(targetId)
 
