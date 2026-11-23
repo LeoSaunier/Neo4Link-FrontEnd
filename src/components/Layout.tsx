@@ -51,7 +51,7 @@ export function Layout() {
     savePanelPreference(open)
   }
 
-  function switchProfile() {
+  function logOut() {
     logout()
     navigate('/login')
   }
@@ -110,15 +110,15 @@ export function Layout() {
 
             {user && (
               <>
-                <Link to={`/users/${user.id}`} className="flex items-center gap-2 rounded-full py-1 pr-1 pl-1 hover:bg-slate-100 sm:pr-3" title="Mon profil">
-                  <Avatar user={user} size="sm" />
-                  <span className="hidden text-sm font-medium text-slate-700 lg:inline">{user.display_name}</span>
+                <Link to={`/users/${user._id}`} className="flex items-center gap-2 rounded-full py-1 pr-1 pl-1 hover:bg-slate-100 sm:pr-3" title="Mon profil">
+                  <Avatar id={user._id} name={user.profile.full_name} size="sm" />
+                  <span className="hidden text-sm font-medium text-slate-700 lg:inline">{user.profile.full_name}</span>
                 </Link>
                 <button
-                  onClick={switchProfile}
+                  onClick={logOut}
                   className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                  title="Changer de profil"
-                  aria-label="Changer de profil"
+                  title="Se déconnecter"
+                  aria-label="Se déconnecter"
                 >
                   <LogoutIcon className="size-5" />
                 </button>

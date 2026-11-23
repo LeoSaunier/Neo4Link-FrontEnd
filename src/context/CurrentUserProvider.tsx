@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, ApiError } from '../api'
 import { errorMessage } from '../lib/format'
-import type { UserSummary } from '../types'
+import type { LoginRequest, RegisterRequest, User } from '../types'
 import { CurrentUserContext, type CurrentUserValue } from './currentUser'
 
-// Il n'y a pas d'authentification dans ce prototype : on « choisit » un profil,
-// et son identifiant est gardé dans le navigateur (localStorage) pour survivre aux rechargements.
+// Après la connexion, l'identifiant de l'utilisateur est gardé dans le navigateur (localStorage)
+// pour que la session survive à un rechargement de la page.
+// Le back n'utilise pas de jeton : les requêtes envoient simplement cet identifiant (author_id, user_id).
 const STORAGE_KEY = 'neo4link.currentUserId'
 
 function readStoredId(): string | null {
@@ -21,45 +22,51 @@ function storeId(id: string | null) {
     if (id) localStorage.setItem(STORAGE_KEY, id)
     else localStorage.removeItem(STORAGE_KEY)
   } catch {
-    // tant pis : l'utilisateur devra rechoisir son profil au prochain chargement
+    // tant pis : il faudra se reconnecter au prochain chargement
   }
 }
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
-  const [userId, setUserId] = useState<string | null>(readStoredId)
-  const [user, setUser] = useState<UserSummary | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [followingIds, setFollowingIds] = useState<ReadonlySet<string>>(new Set())
-  const [loading, setLoading] = useState(userId !== null)
+  const [loading, setLoading] = useState(() => readStoredId() !== null)
   const [error, setError] = useState<string | null>(null)
   const [graphVersion, setGraphVersion] = useState(0)
   const [attempt, setAttempt] = useState(0)
 
-  /** Oublie l'utilisateur courant (déconnexion, ou profil qui n'existe plus). */
+  /** Oublie l'utilisateur courant (déconnexion, ou compte qui n'existe plus). */
   const reset = useCallback(() => {
     storeId(null)
-    setUserId(null)
     setUser(null)
     setFollowingIds(new Set())
     setLoading(false)
     setError(null)
   }, [])
 
-  // Quand l'utilisateur choisi change : charger son profil (MongoDB + Neo4j) et ses abonnements (Neo4j).
-  // `loading` est passé à true par login() / retry(), avant que cet effet ne démarre.
+  /** Ouvre la session : mémorise l'utilisateur et charge ses abonnements depuis Neo4j. */
+  const openSession = useCallback(async (loggedUser: User) => {
+    const following = await api.getFollowing(loggedUser._id)
+    storeId(loggedUser._id)
+    setUser(loggedUser)
+    setFollowingIds(new Set(following.map((u) => u._id)))
+    setError(null)
+  }, [])
+
+  // Au chargement de la page : reprendre la session enregistrée, s'il y en a une.
   useEffect(() => {
-    if (!userId) return
+    const storedId = readStoredId()
+    if (!storedId) return
     let cancelled = false
-    Promise.all([api.getUserProfile(userId), api.getFollowing(userId)])
-      .then(([profile, following]) => {
+    Promise.all([api.getUser(storedId), api.getFollowing(storedId)])
+      .then(([storedUser, following]) => {
         if (cancelled) return
-        setUser(profile)
-        setFollowingIds(new Set(following.map((u) => u.id)))
+        setUser(storedUser)
+        setFollowingIds(new Set(following.map((u) => u._id)))
       })
       .catch((err: unknown) => {
         if (cancelled) return
         if (err instanceof ApiError && err.status === 404) {
-          // Profil disparu (ex. créé dans l'API simulée avant un rechargement) : on revient au choix du profil.
-          reset()
+          reset() // compte disparu (ex. créé dans l'API simulée avant un rechargement)
         } else {
           setError(errorMessage(err))
         }
@@ -70,17 +77,22 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [userId, attempt, reset])
+  }, [attempt, reset])
 
   const login = useCallback(
-    (id: string) => {
-      if (id === userId) return
-      storeId(id)
-      setLoading(true) // évite un instant où user = null alors qu'un profil est en cours de chargement
-      setError(null)
-      setUserId(id)
+    async (input: LoginRequest) => {
+      const loggedUser = await api.login(input) // lève une ApiError si les identifiants sont faux
+      await openSession(loggedUser)
     },
-    [userId],
+    [openSession],
+  )
+
+  const register = useCallback(
+    async (input: RegisterRequest) => {
+      const newUser = await api.register(input)
+      await openSession(newUser)
+    },
+    [openSession],
   )
 
   const retry = useCallback(() => {
@@ -88,6 +100,8 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     setError(null)
     setAttempt((n) => n + 1)
   }, [])
+
+  const userId = user?._id
 
   const follow = useCallback(
     async (targetId: string) => {
@@ -114,19 +128,8 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   )
 
   const value = useMemo<CurrentUserValue>(
-    () => ({
-      user,
-      loading,
-      error,
-      followingIds,
-      graphVersion,
-      login,
-      logout: reset,
-      retry,
-      follow,
-      unfollow,
-    }),
-    [user, loading, error, followingIds, graphVersion, login, reset, retry, follow, unfollow],
+    () => ({ user, loading, error, followingIds, graphVersion, login, register, logout: reset, retry, follow, unfollow }),
+    [user, loading, error, followingIds, graphVersion, login, register, reset, retry, follow, unfollow],
   )
 
   return <CurrentUserContext.Provider value={value}>{children}</CurrentUserContext.Provider>

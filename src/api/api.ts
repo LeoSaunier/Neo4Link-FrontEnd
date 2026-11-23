@@ -1,11 +1,11 @@
 import type {
-  FeedItem,
+  CommentCreate,
+  LoginRequest,
   Post,
   PostCreate,
+  RegisterRequest,
   Suggestion,
   User,
-  UserCreate,
-  UserProfile,
   UserSummary,
 } from '../types'
 
@@ -19,17 +19,26 @@ import type {
  * Les pages ne savent pas laquelle elles utilisent : elles importent `api` depuis ./index.ts.
  */
 export interface Neo4LinkApi {
+  // Authentification
+  register(input: RegisterRequest): Promise<User>
+  login(input: LoginRequest): Promise<User>
+
+  // Utilisateurs et abonnements
   listUsers(): Promise<UserSummary[]>
-  createUser(input: UserCreate): Promise<User>
-  getUserProfile(id: string): Promise<UserProfile>
+  getUser(id: string): Promise<User>
   getUserPosts(id: string): Promise<Post[]>
   getFollowing(id: string): Promise<UserSummary[]>
   getFollowers(id: string): Promise<UserSummary[]>
   follow(id: string, targetId: string): Promise<void>
   unfollow(id: string, targetId: string): Promise<void>
-  getFeed(id: string, limit?: number): Promise<FeedItem[]>
+  getFeed(id: string, limit?: number): Promise<Post[]>
   getSuggestions(id: string, limit?: number): Promise<Suggestion[]>
+
+  // Publications (chaque action renvoie le post mis à jour)
   createPost(input: PostCreate): Promise<Post>
+  likePost(postId: string, userId: string): Promise<Post>
+  unlikePost(postId: string, userId: string): Promise<Post>
+  addComment(postId: string, input: CommentCreate): Promise<Post>
 }
 
 /** Erreur renvoyée par l'API, avec le code HTTP et le message ("detail") du back. */

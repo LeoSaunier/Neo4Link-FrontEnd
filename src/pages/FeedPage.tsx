@@ -12,7 +12,7 @@ import type { Post } from '../types'
 export function FeedPage() {
   const { user, graphVersion, followingIds } = useLoggedUser()
   // Rechargé quand l'utilisateur change ou quand il suit / ne suit plus quelqu'un (graphVersion)
-  const feed = useAsync(() => api.getFeed(user.id, 20), [user.id, graphVersion])
+  const feed = useAsync(() => api.getFeed(user._id, 20), [user._id, graphVersion])
   const [published, setPublished] = useState<Post | null>(null)
 
   return (
@@ -24,7 +24,10 @@ export function FeedPage() {
         steps={[
           { db: 'neo4j', text: <>Trouver les personnes que je suis : <code>(moi)-[:FOLLOWS]-&gt;(f)</code></> },
           { db: 'mongodb', text: <>Lire leurs 20 publications les plus récentes : <code>db.posts.find(&#123;author_id: &#123;$in: …&#125;&#125;)</code></> },
-          { db: 'mongodb', text: 'Récupérer les profils des auteurs pour afficher noms et postes (hydratation)' },
+          {
+            db: 'mongodb',
+            text: "Pas de 3ᵉ requête : chaque post contient déjà une copie du nom de l'auteur (author_snapshot).",
+          },
         ]}
       />
 
@@ -34,7 +37,7 @@ export function FeedPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
           <span>Publié ! Ce post apparaîtra dans le fil des personnes qui vous suivent.</span>
           <span className="flex gap-3">
-            <Link to={`/users/${user.id}`} className="font-medium underline">
+            <Link to={`/users/${user._id}`} className="font-medium underline">
               Voir sur mon profil
             </Link>
             <button onClick={() => setPublished(null)} className="text-emerald-600 hover:text-emerald-900">
@@ -59,7 +62,7 @@ export function FeedPage() {
           .
         </EmptyState>
       )}
-      {feed.data?.map((item) => <PostCard key={item.id} post={item} author={item.author} />)}
+      {feed.data?.map((post) => <PostCard key={post._id} post={post} />)}
     </div>
   )
 }

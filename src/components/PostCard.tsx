@@ -1,57 +1,95 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { timeAgo } from '../lib/format'
-import type { ArticlePost, ImagePost, PollPost, Post, PostType, UserSummary } from '../types'
+import { api } from '../api'
+import { useCurrentUser } from '../context/currentUser'
+import { errorMessage, timeAgo } from '../lib/format'
+import type { Post } from '../types'
 import { Avatar } from './Avatar'
 import { CodeIcon, HeartIcon } from './icons'
 import { Card } from './ui'
 
-const TYPE_LABELS: Record<PostType, { label: string; className: string }> = {
-  text: { label: 'Texte', className: 'bg-slate-100 text-slate-600' },
-  image: { label: 'Image', className: 'bg-violet-100 text-violet-700' },
-  poll: { label: 'Sondage', className: 'bg-amber-100 text-amber-700' },
-  article: { label: 'Article', className: 'bg-teal-100 text-teal-700' },
-}
-
-/** Affiche un post, quel que soit son type (texte, image, sondage, article). */
-export function PostCard({ post, author }: { post: Post; author: UserSummary }) {
+/**
+ * Affiche une publication, avec ses « j'aime » et ses commentaires.
+ *
+ * Le nom de l'auteur vient de `author_snapshot`, une copie enregistrée dans le post par le back :
+ * pas besoin de relire la collection `users` pour afficher le fil.
+ *
+ * Le post est gardé dans un état local : après un j'aime ou un commentaire, le back renvoie
+ * le post mis à jour, qui remplace l'ancien.
+ */
+export function PostCard({ post: initialPost }: { post: Post }) {
+  const { user } = useCurrentUser()
+  const [post, setPost] = useState(initialPost)
+  const [showComments, setShowComments] = useState(false)
   const [showJson, setShowJson] = useState(false)
-  const type = TYPE_LABELS[post.type]
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const liked = user !== null && post.likes.includes(user._id)
+
+  async function toggleLike() {
+    if (!user) return
+    setBusy(true)
+    setError(null)
+    try {
+      setPost(liked ? await api.unlikePost(post._id, user._id) : await api.likePost(post._id, user._id))
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <Card>
       <article className="p-4">
         <header className="flex items-start gap-3">
-          <Link to={`/users/${author.id}`}>
-            <Avatar user={author} />
+          <Link to={`/users/${post.author_id}`}>
+            <Avatar id={post.author_id} name={post.author_snapshot.full_name} />
           </Link>
           <div className="min-w-0 flex-1">
-            <Link to={`/users/${author.id}`} className="font-semibold text-slate-900 hover:underline">
-              {author.display_name}
+            <Link to={`/users/${post.author_id}`} className="font-semibold text-slate-900 hover:underline">
+              {post.author_snapshot.full_name}
             </Link>
             <p className="truncate text-xs text-slate-500">
-              {author.job_title} · {timeAgo(post.created_at)}
+              @{post.author_snapshot.username} · {timeAgo(post.created_at)}
             </p>
           </div>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${type.className}`}>{type.label}</span>
         </header>
 
-        <div className="mt-3">
-          <PostBody post={post} />
-        </div>
+        <p className="mt-3 whitespace-pre-line text-slate-800">{post.content.text}</p>
 
-        <footer className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          {post.tags.map((tag) => (
-            <span key={tag} className="text-neo">
-              #{tag}
-            </span>
-          ))}
-          <span className="ml-auto flex items-center gap-1" title="J'aime">
-            <HeartIcon className="size-4" /> {post.likes_count}
-          </span>
+        {post.tags.length > 0 && (
+          <p className="mt-2 flex flex-wrap gap-2 text-sm">
+            {post.tags.map((tag) => (
+              <span key={tag} className="text-neo">
+                #{tag}
+              </span>
+            ))}
+          </p>
+        )}
+
+        <footer className="mt-3 flex items-center gap-1 border-t border-slate-100 pt-2 text-sm text-slate-500">
+          <button
+            onClick={toggleLike}
+            disabled={busy || !user}
+            className={`flex items-center gap-1 rounded-md px-2 py-1 transition-colors hover:bg-rose-50 ${liked ? 'text-rose-600' : 'hover:text-rose-600'}`}
+            aria-pressed={liked}
+            title={liked ? "Je n'aime plus" : "J'aime"}
+          >
+            <HeartIcon className="size-4" fill={liked ? 'currentColor' : 'none'} />
+            {post.likes.length}
+          </button>
+          <button
+            onClick={() => setShowComments(!showComments)}
+            className={`rounded-md px-2 py-1 transition-colors hover:bg-slate-100 ${showComments ? 'text-slate-900' : ''}`}
+            aria-expanded={showComments}
+          >
+            {post.comments.length} commentaire{post.comments.length > 1 ? 's' : ''}
+          </button>
           <button
             onClick={() => setShowJson(!showJson)}
-            className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition-colors ${
+            className={`ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors ${
               showJson ? 'bg-mongo/10 text-mongo' : 'hover:bg-slate-100'
             }`}
             title="Voir le document tel qu'il est stocké dans MongoDB"
@@ -61,119 +99,81 @@ export function PostCard({ post, author }: { post: Post; author: UserSummary }) 
           </button>
         </footer>
 
+        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        {showComments && <Comments post={post} onUpdated={setPost} />}
         {showJson && <MongoDocument post={post} />}
       </article>
     </Card>
   )
 }
 
-/**
- * Le cœur du polymorphisme : selon `post.type`, on affiche un composant différent.
- * TypeScript sait, dans chaque `case`, quels champs existent (ex. `post.options` seulement pour un sondage).
- */
-function PostBody({ post }: { post: Post }) {
-  switch (post.type) {
-    case 'text':
-      return <p className="whitespace-pre-line text-slate-800">{post.text}</p>
-    case 'image':
-      return <ImageBody post={post} />
-    case 'poll':
-      return <PollBody post={post} />
-    case 'article':
-      return <ArticleBody post={post} />
+/** Commentaires (tableau `comments` imbriqué dans le post) + formulaire pour en ajouter un. */
+function Comments({ post, onUpdated }: { post: Post; onUpdated: (post: Post) => void }) {
+  const { user } = useCurrentUser()
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!user || !text.trim()) return
+    setSending(true)
+    setError(null)
+    try {
+      onUpdated(await api.addComment(post._id, { user_id: user._id, text }))
+      setText('')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setSending(false)
+    }
   }
-}
 
-function ImageBody({ post }: { post: ImagePost }) {
-  const exif = Object.entries(post.image.exif ?? {})
   return (
-    <div className="space-y-2">
-      {post.caption && <p className="text-slate-800">{post.caption}</p>}
-      <img
-        src={post.image.url}
-        alt={post.image.alt ?? ''}
-        width={post.image.width}
-        height={post.image.height}
-        className="w-full rounded-lg bg-slate-100 object-cover"
-        loading="lazy"
-      />
-      {exif.length > 0 && (
-        <details className="text-xs text-slate-500">
-          <summary className="cursor-pointer select-none">Métadonnées EXIF ({exif.length})</summary>
-          <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-            {exif.map(([key, value]) => (
-              <div key={key} className="contents">
-                <dt className="font-medium text-slate-600">{key}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
+    <div className="mt-3 space-y-3">
+      {post.comments.map((comment, i) => (
+        <div key={i} className="flex gap-2">
+          <Avatar id={comment.user_id} name={comment.author_snapshot.full_name} size="xs" />
+          <div className="min-w-0 flex-1 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+            <p>
+              <Link to={`/users/${comment.user_id}`} className="font-semibold text-slate-900 hover:underline">
+                {comment.author_snapshot.full_name}
+              </Link>{' '}
+              <span className="text-xs text-slate-400">{timeAgo(comment.created_at)}</span>
+            </p>
+            <p className="whitespace-pre-line text-slate-700">{comment.text}</p>
+          </div>
+        </div>
+      ))}
+      {user && (
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <Avatar id={user._id} name={user.profile.full_name} size="xs" />
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Écrire un commentaire…"
+            className="min-w-0 flex-1 rounded-full border border-slate-300 px-3 py-1 text-sm focus:border-neo focus:ring-2 focus:ring-neo/20 focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={sending || !text.trim()}
+            className="rounded-full px-3 text-sm font-semibold text-neo hover:bg-neo/10 disabled:text-slate-300 disabled:hover:bg-transparent"
+          >
+            {sending ? '…' : 'Envoyer'}
+          </button>
+        </form>
       )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
 }
 
-function PollBody({ post }: { post: PollPost }) {
-  const total = post.options.reduce((sum, option) => sum + option.votes, 0)
-  const best = Math.max(...post.options.map((o) => o.votes))
-  return (
-    <div>
-      <p className="font-medium text-slate-900">{post.question}</p>
-      <ul className="mt-2 space-y-1.5">
-        {post.options.map((option) => {
-          const percent = total === 0 ? 0 : Math.round((option.votes / total) * 100)
-          return (
-            <li key={option.label} className="relative overflow-hidden rounded-lg bg-slate-100 px-3 py-1.5 text-sm">
-              <div
-                className={`absolute inset-y-0 left-0 ${option.votes === best && total > 0 ? 'bg-amber-200' : 'bg-slate-200'}`}
-                style={{ width: `${percent}%` }}
-              />
-              <div className="relative flex justify-between">
-                <span>{option.label}</span>
-                <span className="font-medium">{percent} %</span>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-      <p className="mt-1.5 text-xs text-slate-500">{total} vote{total > 1 ? 's' : ''}</p>
-    </div>
-  )
-}
-
-function ArticleBody({ post }: { post: ArticlePost }) {
-  const [expanded, setExpanded] = useState(false)
-  const paragraphs = post.body.split(/\n{2,}/)
-  const visible = expanded ? paragraphs : paragraphs.slice(0, 1)
-  return (
-    <div className="rounded-lg border border-slate-200 p-3">
-      <h3 className="text-lg font-bold text-slate-900">{post.title}</h3>
-      <p className="text-xs text-slate-500">{post.reading_time_min} min de lecture</p>
-      <div className="mt-2 space-y-2 text-slate-700">
-        {visible.map((paragraph, i) => (
-          <p key={i}>{paragraph}</p>
-        ))}
-      </div>
-      {paragraphs.length > 1 && (
-        <button onClick={() => setExpanded(!expanded)} className="mt-2 text-sm font-medium text-neo hover:underline">
-          {expanded ? 'Réduire' : 'Lire la suite'}
-        </button>
-      )}
-    </div>
-  )
-}
-
-/** Le post tel qu'il est stocké dans la collection MongoDB `posts` (champs différents selon le type). */
+/** Le post tel qu'il est stocké dans la collection MongoDB `posts`. */
 function MongoDocument({ post }: { post: Post }) {
-  const { id, ...fields } = post
-  // Un FeedItem contient aussi `author` (ajouté par l'API) : ce champ n'est pas dans le document stocké.
-  const stored = { _id: id, ...fields } as Record<string, unknown>
-  delete stored.author
   return (
     <div className="mt-3 rounded-lg bg-slate-900 p-3">
-      <p className="mb-1 text-xs font-medium text-emerald-300">db.posts — document « {post.type} »</p>
-      <pre className="overflow-x-auto font-mono text-[11px] leading-relaxed text-slate-200">{JSON.stringify(stored, null, 2)}</pre>
+      <p className="mb-1 text-xs font-medium text-emerald-300">db.posts : copie de l'auteur, likes et commentaires dans le même document</p>
+      <pre className="max-h-80 overflow-auto font-mono text-[11px] leading-relaxed text-slate-200">{JSON.stringify(post, null, 2)}</pre>
     </div>
   )
 }
