@@ -165,7 +165,7 @@ Légende de la colonne « Bases » : 🟢 MongoDB · 🔵 Neo4j.
 ### `PostCreate`
 
 Les champs communs `author_id` + `type` + `tags`, puis les champs spécifiques au type
-(mêmes que dans `Post`, sans `id`, `likes_count`, `created_at` que le back calcule) :
+(mêmes que dans `Post`, sans `id`, `likes_count`, `created_at` et `reading_time_min` que le back calcule) :
 
 ```json
 { "author_id": "u01", "type": "poll", "tags": ["team"], "question": "Pizza ou sushi ?", "options": [{"label": "Pizza"}, {"label": "Sushi"}] }

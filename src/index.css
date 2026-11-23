@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* Couleurs du projet, utilisables comme classes Tailwind : bg-mongo, text-neo, border-mongo/30... */
+@theme {
+  --color-mongo: #0f9d58; /* MongoDB = vert */
+  --color-neo: #018bff;   /* Neo4j  = bleu */
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  @apply bg-slate-100 text-slate-800 antialiased;
+}
